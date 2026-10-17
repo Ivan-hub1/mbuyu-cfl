@@ -21,10 +21,16 @@ export async function createQuote(
   return data;
 }
 
+// Extra fields the API adds to quote save/accept responses
+export interface EmailResult {
+  _emailSent?: boolean;
+  _emailError?: string | null;
+}
+
 export async function updateQuote(
   id: string,
-  patch: Partial<QuoteRequest>
-): Promise<QuoteRequest> {
+  patch: Partial<QuoteRequest> & { sendEmailToCustomer?: boolean }
+): Promise<QuoteRequest & EmailResult> {
   const { data } = await api.patch(`/quotes/${id}`, patch);
   return data;
 }

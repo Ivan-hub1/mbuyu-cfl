@@ -12,6 +12,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/dashboard',              label: 'Overview',            icon: '📊', roles: ['*'] },
+  { to: '/dashboard/companies',    label: 'Companies',           icon: '🏢', roles: ['SUPER_ADMIN'] },
   { to: '/dashboard/quotes',       label: 'Quote Requests',      icon: '📝', roles: ['ADMIN'] },
   { to: '/dashboard/users',        label: 'Staff & Users',       icon: '👥', roles: ['ADMIN'] },
   { to: '/dashboard/statements',   label: 'Customer Statements', icon: '📄', roles: ['ADMIN'] },
@@ -26,17 +27,19 @@ const NAV: NavItem[] = [
   { to: '/dashboard/my-shipments', label: 'My Shipments',        icon: '📦', roles: ['CUSTOMER'] },
   { to: '/dashboard/my-quotes',    label: 'My Quotes',           icon: '📝', roles: ['CUSTOMER'] },
   { to: '/dashboard/my-statements', label: 'My Statement',       icon: '📄', roles: ['CUSTOMER'] },
+  { to: '/dashboard/company',      label: 'Company Settings',    icon: '⚙️', roles: ['ADMIN'] },
 ];
 
 function effectiveRoleKey(user: { role?: string; staffRole?: string | null } | null): string {
   if (!user) return 'CUSTOMER';
+  if (user.role === 'SUPER_ADMIN') return 'SUPER_ADMIN';
   if (user.role === 'ADMIN') return 'ADMIN';
   if (user.role === 'STAFF') return user.staffRole || 'HEAD_OFFICE';
   return 'CUSTOMER';
 }
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
+  const { user, tenant } = useAuthStore();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -52,7 +55,8 @@ export default function Dashboard() {
 
   const visibleNav = NAV.filter((item) => {
     if (item.roles.includes('*')) return true;
-    if (roleKey === 'ADMIN') return true;
+    // Company admins see every company-level page, but not platform pages
+    if (roleKey === 'ADMIN') return !item.roles.includes('SUPER_ADMIN');
     return item.roles.includes(roleKey);
   });
 
@@ -99,6 +103,7 @@ export default function Dashboard() {
                 <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in</p>
                 <p className="text-sm font-semibold truncate">{user?.name}</p>
                 <p className="text-xs text-brand-orange">{roleKey.replace('_', ' ')}</p>
+                {tenant && <p className="text-xs text-gray-500 truncate">{tenant.name}</p>}
               </div>
               <button
                 onClick={() => setDrawerOpen(false)}
@@ -147,6 +152,7 @@ export default function Dashboard() {
               <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
               <p className="text-sm font-semibold truncate">{user?.name}</p>
               <p className="text-xs text-brand-orange">{roleKey.replace('_', ' ')}</p>
+              {tenant && <p className="text-xs text-gray-500 truncate">{tenant.name}</p>}
             </div>
             <nav className="space-y-1">
               {visibleNav.map((item) => (
@@ -193,6 +199,7 @@ function DashboardOverview() {
   const isOperations = roleKey === 'OPERATIONS';
   const isDriver = roleKey === 'DRIVER';
   const isCustomer = roleKey === 'CUSTOMER';
+  const isSuperAdmin = roleKey === 'SUPER_ADMIN';
 
   return (
     <>
@@ -225,6 +232,9 @@ function DashboardOverview() {
       <div className="card">
         <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3">
+          {isSuperAdmin && (
+            <Link to="/dashboard/companies" className="btn-primary text-center text-sm">Companies</Link>
+          )}
           {isAdmin && (
             <>
               <Link to="/dashboard/shipments" className="btn-outline text-center text-sm">Shipments</Link>

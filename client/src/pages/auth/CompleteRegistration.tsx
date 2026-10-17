@@ -98,7 +98,7 @@ export default function CompleteRegistration() {
         documentUrl: documentUrl.trim() || null,
       });
 
-      login(data.token, data.user);
+      login(data.token, data.user, data.tenant);
       navigate('/dashboard');
     } catch (err: any) {
       setError(

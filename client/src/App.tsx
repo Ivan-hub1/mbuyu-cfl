@@ -25,6 +25,8 @@ import StatementDetail from './pages/dashboard/StatementDetail';
 import MyStatements from './pages/dashboard/MyStatements';
 import Transfers from './pages/dashboard/Transfers';
 import Fleet from './pages/dashboard/Fleet';
+import Companies from './pages/dashboard/Companies';
+import CompanySettings from './pages/dashboard/CompanySettings';
 
 import DriverWelcome from './pages/driver/DriverWelcome';
 import DriverShipments from './pages/driver/DriverShipments';
@@ -76,6 +78,8 @@ function AnimatedRoutes() {
           <Route path="statements/:email" element={<StatementDetail />} />
           <Route path="my-statements" element={<MyStatements />} />
           <Route path="transfers" element={<Transfers />} />
+          <Route path="companies" element={<Companies />} />
+          <Route path="company" element={<CompanySettings />} />
         </Route>
 
         <Route

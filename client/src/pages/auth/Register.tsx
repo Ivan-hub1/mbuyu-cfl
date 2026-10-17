@@ -25,7 +25,7 @@ export default function Register() {
         password,
         phone,
       });
-      login(data.token, data.user);
+      login(data.token, data.user, data.tenant);
       navigate('/dashboard');
     } catch (err: any) {
       const msg =

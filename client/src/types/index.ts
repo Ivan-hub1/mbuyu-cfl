@@ -77,6 +77,8 @@ export interface QuoteRequest {
   taxName?: string | null;
   taxRate?: string | null;
   taxAmount?: string | null;
+  // null/undefined = not decided yet (UI falls back to the destination's tax rule)
+  taxEnabled?: boolean | null;
 
   // Link to shipment
   shipmentId?: string | null;

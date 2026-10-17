@@ -243,8 +243,14 @@ function QuoteDetail({
     quote.quotedCurrency || 'USD'
   );
   const [adminResponse, setAdminResponse] = useState(quote.adminResponse || '');
-  const [saved, setSaved] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{
+    text: string;
+    tone: 'ok' | 'warn';
+  } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Email the customer automatically when the quote becomes QUOTED or REJECTED
+  const [emailCustomer, setEmailCustomer] = useState(true);
+  const isAccepted = status === 'ACCEPTED' || !!quote.shipmentId;
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const navigate = useNavigate();
 
@@ -257,7 +263,7 @@ function QuoteDetail({
     quote.taxRate || (autoRule ? String(autoRule.rate) : '')
   );
   const [applyTax, setApplyTax] = useState(
-    !!(quote.taxRate || autoRule)
+    quote.taxEnabled ?? !!(quote.taxRate || autoRule)
   );
 
   // ─── Live computed values ─────────────────────────────
@@ -272,31 +278,53 @@ function QuoteDetail({
       maximumFractionDigits: 2,
     })}`;
 
-  const save = async (newStatus?: QuoteStatus) => {
+  // forceEmail: true = (re)send the email now, regardless of status change
+  const save = async (newStatus?: QuoteStatus, forceEmail = false) => {
     setSaving(true);
+    setSaveMessage(null);
 
-    const minDuration = new Promise((resolve) => setTimeout(resolve, 2000));
+    const minDuration = new Promise((resolve) => setTimeout(resolve, 1000));
+    const nextStatus = newStatus || status;
 
     try {
-      const patch: Partial<QuoteRequest> = {
-        status: newStatus || status,
-        quotedAmount,
-        quotedCurrency,
-        adminResponse,
-        taxName: applyTax ? taxName : null,
-        taxRate: applyTax ? taxRate : null,
-        taxAmount: applyTax ? taxAmt.toFixed(2) : null,
-      };
-      await Promise.all([updateQuote(quote.id, patch), minDuration]);
-      setStatus(patch.status!);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      const [updated] = await Promise.all([
+        updateQuote(quote.id, {
+          // ACCEPTED is set only by "Accept & Create Shipment", never by save
+          ...(!isAccepted && { status: nextStatus }),
+          quotedAmount,
+          quotedCurrency,
+          adminResponse,
+          taxEnabled: applyTax,
+          taxName: applyTax ? taxName : null,
+          taxRate: applyTax ? taxRate : null,
+          // undefined = let the server email on QUOTED/REJECTED; false = never
+          sendEmailToCustomer: forceEmail ? true : emailCustomer ? undefined : false,
+        }),
+        minDuration,
+      ]);
+      setStatus(updated.status);
+      if (updated._emailSent) {
+        setSaveMessage({ text: `✓ Saved — email sent to ${quote.email}`, tone: 'ok' });
+      } else if (updated._emailError) {
+        setSaveMessage({ text: `Saved, but ${updated._emailError}`, tone: 'warn' });
+      } else {
+        setSaveMessage({ text: '✓ Saved', tone: 'ok' });
+      }
     } catch (err) {
       console.error(err);
-      alert('Failed to save response');
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      alert(`Failed to save response\n\n${e.response?.data?.error || e.message || ''}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  const reject = () => {
+    if (!confirm(`Reject quote ${quote.reference}?${emailCustomer ? '\n\nThe customer will be emailed.' : ''}`)) {
+      return;
+    }
+    setStatus('REJECTED');
+    save('REJECTED');
   };
 
   return (
@@ -572,14 +600,33 @@ function QuoteDetail({
                   value={status}
                   onChange={(e) => setStatus(e.target.value as QuoteStatus)}
                   className="input-field"
+                  disabled={isAccepted}
                 >
                   <option value="NEW">NEW</option>
                   <option value="REVIEWING">REVIEWING</option>
                   <option value="QUOTED">QUOTED</option>
-                  <option value="ACCEPTED">ACCEPTED</option>
+                  <option value="ACCEPTED" disabled>
+                    ACCEPTED (use “Accept & Create Shipment”)
+                  </option>
                   <option value="REJECTED">REJECTED</option>
                 </select>
               </div>
+
+              {/* ── Email ── */}
+              {!isAccepted && (
+                <label className="flex items-start gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={emailCustomer}
+                    onChange={(e) => setEmailCustomer(e.target.checked)}
+                    className="accent-brand-orange w-4 h-4 mt-0.5 cursor-pointer"
+                  />
+                  <span>
+                    Email the customer when this quote is marked QUOTED or REJECTED
+                    <span className="block text-xs text-gray-500">{quote.email}</span>
+                  </span>
+                </label>
+              )}
 
               <button
                 onClick={() => save()}
@@ -589,7 +636,7 @@ function QuoteDetail({
                 {saving ? 'Saving…' : 'Save Response'}
               </button>
 
-              {quotedAmount && (
+              {quotedAmount && !isAccepted && (
                 <button
                   onClick={() => {
                     setStatus('QUOTED');
@@ -602,13 +649,33 @@ function QuoteDetail({
                 </button>
               )}
 
-              {status === 'QUOTED' && !quote.shipmentId && (
+              {status === 'QUOTED' && !isAccepted && (
+                <button
+                  onClick={() => save('QUOTED', true)}
+                  className="btn-outline w-full text-sm"
+                  disabled={saving}
+                >
+                  ✉ Re-send quote email
+                </button>
+              )}
+
+              {status === 'QUOTED' && !isAccepted && (
                 <button
                   onClick={() => setShowAcceptModal(true)}
                   className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition disabled:opacity-60"
                   disabled={saving}
                 >
                   ✓ Accept & Create Shipment
+                </button>
+              )}
+
+              {status !== 'REJECTED' && !isAccepted && (
+                <button
+                  onClick={reject}
+                  className="w-full py-2.5 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 text-sm font-semibold transition disabled:opacity-60"
+                  disabled={saving}
+                >
+                  ✕ Reject Quote
                 </button>
               )}
 
@@ -626,8 +693,14 @@ function QuoteDetail({
                 </div>
               )}
 
-              {saved && (
-                <p className="text-center text-sm text-green-400">✓ Saved</p>
+              {saveMessage && (
+                <p
+                  className={`text-center text-sm ${
+                    saveMessage.tone === 'ok' ? 'text-green-400' : 'text-yellow-400'
+                  }`}
+                >
+                  {saveMessage.text}
+                </p>
               )}
 
               {quote.respondedAt && (
@@ -674,6 +747,7 @@ function AcceptQuoteModal({
   const [weightKg, setWeightKg] = useState(quote.weightKg || '');
   const [volumeCbm, setVolumeCbm] = useState(quote.volumeCbm || '');
   const [pieces, setPieces] = useState(quote.pieces || '');
+  const [emailCustomer, setEmailCustomer] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -700,10 +774,16 @@ function AcceptQuoteModal({
         weightKg: weightKg || quote.weightKg,
         volumeCbm: volumeCbm || null,
         pieces: pieces || quote.pieces,
+        sendEmailToCustomer: emailCustomer,
       });
 
+      const emailLine = data._emailSent
+        ? `Tracking number emailed to ${quote.email}.`
+        : data._emailError
+        ? `⚠ ${data._emailError}`
+        : 'No email sent.';
       alert(
-        `✅ Shipment created!\n\nTracking number: ${data.trackingNumber}\n\nCustomer has been marked as ACCEPTED.`
+        `✅ Shipment created!\n\nTracking number: ${data.trackingNumber}\n\nQuote marked as ACCEPTED.\n${emailLine}`
       );
       onSuccess();
     } catch (err: any) {
@@ -827,6 +907,19 @@ function AcceptQuoteModal({
               ))}
             </select>
           </div>
+
+          <label className="flex items-start gap-2 text-sm text-gray-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={emailCustomer}
+              onChange={(e) => setEmailCustomer(e.target.checked)}
+              className="accent-brand-orange w-4 h-4 mt-0.5 cursor-pointer"
+            />
+            <span>
+              Email the customer their tracking number
+              <span className="block text-xs text-gray-500">{quote.email}</span>
+            </span>
+          </label>
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/40 text-red-400 rounded-lg p-3 text-sm">
