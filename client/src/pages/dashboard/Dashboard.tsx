@@ -55,8 +55,13 @@ export default function Dashboard() {
 
   const visibleNav = NAV.filter((item) => {
     if (item.roles.includes('*')) return true;
-    // Company admins see every company-level page, but not platform pages
-    if (roleKey === 'ADMIN') return !item.roles.includes('SUPER_ADMIN');
+    // Admins see every management page, but not the driver/customer-only ones;
+    // only super admins see platform pages
+    if (roleKey === 'SUPER_ADMIN' || roleKey === 'ADMIN') {
+      const forAdmins = item.roles.some((r) => !['DRIVER', 'CUSTOMER'].includes(r));
+      const platformOnly = item.roles.includes('SUPER_ADMIN') && item.roles.length === 1;
+      return forAdmins && (roleKey === 'SUPER_ADMIN' || !platformOnly);
+    }
     return item.roles.includes(roleKey);
   });
 
@@ -194,7 +199,7 @@ export default function Dashboard() {
 function DashboardOverview() {
   const { user } = useAuthStore();
   const roleKey = effectiveRoleKey(user);
-  const isAdmin = roleKey === 'ADMIN';
+  const isAdmin = roleKey === 'ADMIN' || roleKey === 'SUPER_ADMIN';
   const isHeadOffice = roleKey === 'HEAD_OFFICE';
   const isOperations = roleKey === 'OPERATIONS';
   const isDriver = roleKey === 'DRIVER';

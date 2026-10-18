@@ -27,9 +27,7 @@ export default function Login() {
       login(data.token, data.user, data.tenant);
 
       const user = data.user;
-      if (user.role === 'SUPER_ADMIN') {
-        navigate('/dashboard/companies');
-      } else if (user.role === 'STAFF' && user.staffRole === 'DRIVER') {
+      if (user.role === 'STAFF' && user.staffRole === 'DRIVER') {
         navigate('/driver/welcome');
       } else if (user.role === 'STAFF' && user.staffRole === 'OPERATIONS') {
         navigate('/dashboard/maintenance');

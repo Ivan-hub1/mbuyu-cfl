@@ -29,6 +29,7 @@ export default function Navbar() {
 
   const roleKey = (() => {
     if (!user) return 'GUEST';
+    if (user.role === 'SUPER_ADMIN') return 'SUPER_ADMIN';
     if (user.role === 'ADMIN') return 'ADMIN';
     if (user.role === 'STAFF') return user.staffRole || 'HEAD_OFFICE';
     return 'CUSTOMER';

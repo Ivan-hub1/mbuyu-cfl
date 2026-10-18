@@ -756,7 +756,7 @@ function AcceptQuoteModal({
       .get('/admin/users')
       .then(({ data }) => {
         const staff = data.filter(
-          (u: any) => u.role === 'STAFF' || u.role === 'ADMIN'
+          (u: any) => ['STAFF', 'ADMIN', 'SUPER_ADMIN'].includes(u.role)
         );
         setStaffList(staff);
       })
