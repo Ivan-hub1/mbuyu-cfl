@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
-import { getAllQuotes, STATUS_COLOR, updateQuote } from '../../lib/quotes';
+import {
+  getAllQuotes,
+  STATUS_COLOR,
+  updateQuote,
+  type EmailResult,
+} from '../../lib/quotes';
 import type { QuoteRequest, QuoteStatus } from '../../types';
 
 // ─── Download quote as branded PDF ───────────────────────
@@ -278,8 +283,7 @@ function QuoteDetail({
       maximumFractionDigits: 2,
     })}`;
 
-  // forceEmail: true = (re)send the email now, regardless of status change
-  const save = async (newStatus?: QuoteStatus, forceEmail = false) => {
+  const save = async (newStatus?: QuoteStatus) => {
     setSaving(true);
     setSaveMessage(null);
 
@@ -298,7 +302,7 @@ function QuoteDetail({
           taxName: applyTax ? taxName : null,
           taxRate: applyTax ? taxRate : null,
           // undefined = let the server email on QUOTED/REJECTED; false = never
-          sendEmailToCustomer: forceEmail ? true : emailCustomer ? undefined : false,
+          sendEmailToCustomer: emailCustomer ? undefined : false,
         }),
         minDuration,
       ]);
@@ -314,6 +318,27 @@ function QuoteDetail({
       console.error(err);
       const e = err as { response?: { data?: { error?: string } }; message?: string };
       alert(`Failed to save response\n\n${e.response?.data?.error || e.message || ''}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Re-send the email matching the current status (quote / rejection / booking)
+  const resendEmail = async () => {
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const { data } = await api.post<EmailResult & { to: string }>(
+        `/quotes/${quote.id}/resend-email`
+      );
+      setSaveMessage(
+        data._emailSent
+          ? { text: `✓ Email sent to ${data.to}`, tone: 'ok' }
+          : { text: data._emailError || 'Email was not sent.', tone: 'warn' }
+      );
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      setSaveMessage({ text: e.response?.data?.error || 'Failed to resend email.', tone: 'warn' });
     } finally {
       setSaving(false);
     }
@@ -649,13 +674,17 @@ function QuoteDetail({
                 </button>
               )}
 
-              {status === 'QUOTED' && !isAccepted && (
+              {(status === 'QUOTED' || status === 'REJECTED' || isAccepted) && (
                 <button
-                  onClick={() => save('QUOTED', true)}
+                  onClick={resendEmail}
                   className="btn-outline w-full text-sm"
                   disabled={saving}
                 >
-                  ✉ Re-send quote email
+                  {isAccepted
+                    ? '✉ Resend booking email (tracking number)'
+                    : status === 'REJECTED'
+                    ? '✉ Resend rejection email'
+                    : '✉ Resend quote email'}
                 </button>
               )}
 

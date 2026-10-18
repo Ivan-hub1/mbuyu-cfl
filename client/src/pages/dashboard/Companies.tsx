@@ -70,6 +70,26 @@ export default function Companies() {
       .finally(() => setLoading(false));
   }, []);
 
+  const resendAdminLogin = async (c: Company) => {
+    if (
+      !confirm(
+        `Email ${c.name}'s admin a new temporary password?\n\nTheir current password will stop working.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const { data } = await api.post(`/platform/tenants/${c.id}/resend-invite`);
+      alert(
+        data._emailSent
+          ? `✅ Login details emailed to ${data.email}.`
+          : `⚠ ${data._emailError}\n\nGive the admin (${data.email}) this temporary password yourself:\n\n${data.tempPassword}`
+      );
+    } catch (err) {
+      alert(apiError(err, 'Failed to resend login details.'));
+    }
+  };
+
   const toggleActive = async (c: Company) => {
     const action = c.isActive ? 'Deactivate' : 'Reactivate';
     if (
@@ -146,6 +166,12 @@ export default function Companies() {
                   <Stat label="Users" value={c._count.users} />
                   <Stat label="Shipments" value={c._count.shipments} />
                   <Stat label="Vehicles" value={c._count.vehicles} />
+                  <button
+                    onClick={() => resendAdminLogin(c)}
+                    className="text-xs px-3 py-2 rounded-lg border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 transition"
+                  >
+                    Resend admin login
+                  </button>
                   <button
                     onClick={() => toggleActive(c)}
                     className={`text-xs px-3 py-2 rounded-lg border transition ${

@@ -53,6 +53,27 @@ export default function StaffManagement() {
     refresh();
   }, []);
 
+  const handleResendInvite = async (id: string, name: string) => {
+    if (
+      !confirm(
+        `Send ${name} a new temporary password by email?\n\nTheir current password will stop working.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const { data } = await api.post(`/admin/users/${id}/resend-invite`);
+      alert(
+        data._emailSent
+          ? `✅ Login details emailed to ${data.email}.`
+          : `⚠ ${data._emailError}\n\nGive ${name} this temporary password yourself:\n\n${data.tempPassword}`
+      );
+    } catch (err) {
+      console.error(err);
+      alert('Failed to resend login details');
+    }
+  };
+
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
     try {
@@ -159,12 +180,20 @@ export default function StaffManagement() {
                     </td>
                     <td className="p-4">
                       {u.id !== currentUser?.id ? (
-                        <button
-                          onClick={() => handleDelete(u.id, u.name)}
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => handleResendInvite(u.id, u.name)}
+                            className="text-brand-orange hover:underline text-xs"
+                          >
+                            Resend login
+                          </button>
+                          <button
+                            onClick={() => handleDelete(u.id, u.name)}
+                            className="text-red-400 hover:text-red-300 text-xs"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-gray-500 text-xs">(You)</span>
                       )}
